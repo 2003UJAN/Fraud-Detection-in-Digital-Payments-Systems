@@ -3,20 +3,16 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.pkl
-*.joblib
+*.db
 
-# Environment
+# Envs
 .env
-.venv/
 venv/
+.venv/
 
-# IDEs
-.vscode/
-.idea/
+# Models
+models/
+*.pkl
 
-# OS
-.DS_Store
-
-# Streamlit cache
+# Streamlit
 .streamlit/
