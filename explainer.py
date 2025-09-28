@@ -1,25 +1,12 @@
-import os
-from google import genai
+import shap
+import matplotlib.pyplot as plt
+from utils import load_model
 
-# Initialize Gemini client
-def get_client():
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("Set GEMINI_API_KEY in environment variables")
-    return genai.Client(api_key=api_key)
+def explain_prediction(features):
+    model = load_model()
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(features)
 
-
-def explain_transaction(transaction_dict, fraud_prob, model="gemini-2.5-flash"):
-    client = get_client()
-
-    prompt = (
-        f"You are a concise fraud investigator assistant. "
-        f"Given this transaction and its model fraud probability, "
-        f"write 3 short bullet points explaining why it might be flagged and next steps.\n\n"
-        f"Transaction: {transaction_dict}\n"
-        f"Model fraud probability: {fraud_prob:.3f}\n"
-        "Return only 3 bullet points."
-    )
-
-    resp = client.models.generate_content(model=model, contents=prompt)
-    return resp.text if hasattr(resp, "text") else str(resp)
+    shap.summary_plot(shap_values, features, show=False)
+    plt.savefig("shap_summary.png")
+    return "shap_summary.png"
