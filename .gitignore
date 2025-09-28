@@ -1,58 +1,22 @@
-# --------------------------
 # Python
-# --------------------------
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
-*.so
-*.egg-info/
-*.egg
-*.manifest
-*.spec
+*.pkl
+*.joblib
 
-# --------------------------
-# Virtual environments
-# --------------------------
+# Environment
+.env
 .venv/
-env/
 venv/
-ENV/
 
-# --------------------------
-# Jupyter / Colab
-# --------------------------
-.ipynb_checkpoints/
-*.ipynb
+# IDEs
+.vscode/
+.idea/
 
-# --------------------------
-# Logs & temp
-# --------------------------
-*.log
-*.tmp
-*.swp
+# OS
 .DS_Store
 
-# --------------------------
-# Model & data artifacts
-# --------------------------
-*.joblib
-*.pkl
-*.h5
-*.sav
-*.model
-*.bin
-synthetic_transactions.csv
-
-# --------------------------
-# Secrets
-# --------------------------
-.env
-secrets.json
-*.key
-*.pem
-
-# --------------------------
-# Streamlit / cache
-# --------------------------
+# Streamlit cache
 .streamlit/
