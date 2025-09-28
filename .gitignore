@@ -1,0 +1,58 @@
+# --------------------------
+# Python
+# --------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+*.manifest
+*.spec
+
+# --------------------------
+# Virtual environments
+# --------------------------
+.venv/
+env/
+venv/
+ENV/
+
+# --------------------------
+# Jupyter / Colab
+# --------------------------
+.ipynb_checkpoints/
+*.ipynb
+
+# --------------------------
+# Logs & temp
+# --------------------------
+*.log
+*.tmp
+*.swp
+.DS_Store
+
+# --------------------------
+# Model & data artifacts
+# --------------------------
+*.joblib
+*.pkl
+*.h5
+*.sav
+*.model
+*.bin
+synthetic_transactions.csv
+
+# --------------------------
+# Secrets
+# --------------------------
+.env
+secrets.json
+*.key
+*.pem
+
+# --------------------------
+# Streamlit / cache
+# --------------------------
+.streamlit/
