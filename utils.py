@@ -12,7 +12,7 @@ def train_dummy_model():
     """Train a quick dummy model if no saved model exists"""
     print("⚠️ No trained model found. Training a new dummy model...")
 
-    # Small dummy dataset (replace with real dataset if available)
+    # Small dummy dataset
     data = {
         "amount": [100, 500, 200, 300, 10000, 50],
         "oldbalanceOrg": [1000, 1500, 300, 400, 20000, 60],
@@ -26,11 +26,11 @@ def train_dummy_model():
     X = df.drop("fraud", axis=1)
     y = df["fraud"]
 
-    # Train a Random Forest
+    # Train model
     model = RandomForestClassifier(random_state=42)
     model.fit(X, y)
 
-    # Save the trained model
+    # Save model
     os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
     joblib.dump(model, MODEL_PATH)
 
@@ -38,7 +38,7 @@ def train_dummy_model():
     return model
 
 def load_model():
-    """Load model if exists, else auto-train a dummy model"""
+    """Load model if exists, else auto-train"""
     if not os.path.exists(MODEL_PATH):
         return train_dummy_model()
     return joblib.load(MODEL_PATH)
