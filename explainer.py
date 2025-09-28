@@ -1,45 +1,54 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+from utils import load_model
+from explainer import explain_transaction
 
-import os
-import json
+# Load model
+model = load_model()
 
-# attempt to import Gemini client
-try:
-    from google import genai
-    GEMINI_AVAILABLE = True
-except Exception:
-    GEMINI_AVAILABLE = False
+st.title("🔎 Fraud Detection with Gemini-Powered Explanations")
 
-# Choose the Gemini model you have access to
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# Sidebar: user input
+st.sidebar.header("Transaction Input")
+amount = st.sidebar.number_input("Transaction Amount", min_value=0.0, value=120.0)
+device_type = st.sidebar.selectbox("Device Type", ["mobile", "desktop", "pos", "tablet"])
+country = st.sidebar.selectbox("Country", ["IN", "US", "GB", "CN", "DE", "FR", "BR", "NG", "AU"])
+hour = st.sidebar.slider("Hour of Day", 0, 23, 14)
+day_of_week = st.sidebar.slider("Day of Week (0=Mon)", 0, 6, 2)
+txn_interval_sec = st.sidebar.number_input("Txn Interval (sec)", min_value=0.0, value=300.0)
+num_prev_txn_1h = st.sidebar.number_input("Num Previous Txns (1h)", min_value=0, value=2)
+is_new_device = st.sidebar.selectbox("Is New Device?", [0, 1])
+num_feature_1 = st.sidebar.number_input("num_feature_1", value=0.5)
+num_feature_2 = st.sidebar.number_input("num_feature_2", value=-0.3)
+num_feature_3 = st.sidebar.number_input("num_feature_3", value=1.1)
+num_feature_4 = st.sidebar.number_input("num_feature_4", value=0.0)
+num_feature_5 = st.sidebar.number_input("num_feature_5", value=2.2)
 
-def gemini_explain_transaction(tx_df, prob, use_gemini=True):
-    """
-    Return a short investigation note for a single-row DataFrame tx_df and probability float prob.
-    If Gemini is available and use_gemini=True, call the model; otherwise return a templated note.
-    """
-    tx = tx_df.iloc[0].to_dict()
-    template = (
-        f"Fraud probability: {prob:.3f}\n"
-        f"Transaction: user={tx.get('user_id')}, amount={tx.get('amount')}, merchant={tx.get('merchant_id')}, device={tx.get('device_type')}, country={tx.get('country')}, hour={tx.get('hour')}.\n\n"
-        "Investigation notes:\n"
-        "- Model flagged this transaction because of anomalous transaction features relative to typical patterns.\n"
-        "- Recommended actions: verify user identity, review user's recent activity, contact merchant as necessary, consider temporary block if multiple alerts.\n"
-    )
+# Convert to DataFrame
+tx = pd.DataFrame([{
+    "user_id": 1234,
+    "amount": amount,
+    "merchant_id": "m_test",
+    "device_type": device_type,
+    "country": country,
+    "hour": hour,
+    "day_of_week": day_of_week,
+    "txn_interval_sec": txn_interval_sec,
+    "num_prev_txn_1h": num_prev_txn_1h,
+    "is_new_device": is_new_device,
+    "num_feature_1": num_feature_1,
+    "num_feature_2": num_feature_2,
+    "num_feature_3": num_feature_3,
+    "num_feature_4": num_feature_4,
+    "num_feature_5": num_feature_5
+}])
 
-    if use_gemini and GEMINI_AVAILABLE:
-        client = genai.Client()
-        prompt = (
-            "You are a concise fraud analyst assistant. Given a payment transaction and model probability, "
-            "write a short 3-bullet investigation note with reasons and recommended next steps. "
-            f"Transaction: {json.dumps(tx)}\nModel fraud probability: {prob:.3f}\n"
-            "Return bullet points only."
-        )
-        try:
-            resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
-            text = getattr(resp, "text", None) or str(resp)
-            # strip/clean
-            return text.strip()
-        except Exception as e:
-            return template + f"\n(GenAI call failed: {e})"
-    else:
-        return template
+if st.button("🔍 Predict Fraud"):
+    prob = model.predict_proba(tx)[0, 1]
+    st.metric("Fraud Probability", f"{prob:.2%}")
+
+    with st.spinner("Explaining with Gemini..."):
+        explanation = explain_transaction(tx.to_dict(orient="records")[0], prob)
+    st.subheader("Investigator Note")
+    st.write(explanation)
