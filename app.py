@@ -46,7 +46,7 @@ if mode == "Manual Entry":
         st.markdown(f"**Fraud Probability:** {proba:.2%}")
 
         # Explainability
-        explanation = explain_prediction(model, features)
+        explanation = explain_prediction(model, features, prob=proba)
         st.markdown("### 🧾 Explanation")
         st.json(explanation)
 
