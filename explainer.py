@@ -1,23 +1,33 @@
-import os
-import google.generativeai as genai
+import shap
+import pandas as pd
 
-# Configure Gemini
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
-def explain_prediction(transaction, prob):
-    """Generate a natural language fraud investigation note."""
-    prompt = f"""
-    You are a fraud analyst. Explain why the following transaction may be fraudulent.
-
-    Transaction: {transaction}
-    Fraud Probability: {prob:.2f}
-
-    Provide a clear, concise investigation-style note.
+def explain_prediction(model, features, prob=None):
     """
+    Generate human-readable explanation for fraud prediction.
+    Uses SHAP values + optional fraud probability.
+    """
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(features)
 
-    try:
-        model = genai.GenerativeModel("gemini-pro")
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"(⚠️ Explanation unavailable: {str(e)})"
+    explanation = {
+        "Top Features": {},
+    }
+
+    # Take feature importance for the first prediction
+    feature_names = features.columns
+    shap_importance = shap_values[1][0] if isinstance(shap_values, list) else shap_values[0]
+
+    # Store top features
+    top_features = sorted(
+        zip(feature_names, shap_importance),
+        key=lambda x: abs(x[1]),
+        reverse=True
+    )[:5]
+
+    explanation["Top Features"] = {f: float(val) for f, val in top_features}
+
+    # Add fraud probability if provided
+    if prob is not None:
+        explanation["Fraud Probability"] = f"{prob:.2%}"
+
+    return explanation
