@@ -1,5 +1,14 @@
-__pycache__/
 .env
+venv/
+__pycache__/
+
+# Model & data artifacts
 *.pkl
-*.png
 *.csv
+
+# Streamlit cache
+.streamlit/
+
+# IDE
+.vscode/
+.idea/
