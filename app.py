@@ -3,68 +3,75 @@ import pandas as pd
 from utils import load_model, load_schema_safe, preprocess_for_inference
 from explainer import explain_prediction
 
-st.set_page_config(page_title="Fraud Detection System", layout="wide")
-
 # Load model + schema
 model = load_model()
 schema_data = load_schema_safe()
 
-LOC_MAP = schema_data.get("mappings", {}).get("LOC_MAP", {})
-TYPE_MAP = schema_data.get("mappings", {}).get("TYPE_MAP", {})
+st.set_page_config(page_title="Fraud Detection in Digital Payments", layout="wide")
 
-st.title("💳 Fraud Detection in Digital Payments")
+st.title("💳 Fraud Detection in Digital Payment Systems")
+st.markdown("Upload a CSV or enter transaction details manually to detect fraud in real-time.")
 
-st.sidebar.header("Navigation")
-mode = st.sidebar.radio("Choose Mode:", ["Single Transaction", "Batch Upload (CSV)"])
+# --- Sidebar: Mode selection ---
+mode = st.sidebar.radio("Choose Input Mode:", ["Manual Entry", "CSV Upload"])
 
-# ------------------- Single Transaction -------------------
-if mode == "Single Transaction":
-    st.subheader("🔍 Check a Single Transaction")
+# --- Manual Entry ---
+if mode == "Manual Entry":
+    st.subheader("📌 Enter Transaction Details")
 
-    amount = st.number_input("Amount ($)", min_value=1.0, max_value=10000.0, value=100.0)
-    transaction_type = st.selectbox("Transaction Type", list(TYPE_MAP.keys()))
-    location = st.selectbox("Location", list(LOC_MAP.keys()))
-    time = st.slider("Hour of Day", 0, 23, 12)
-    device_id = st.number_input("Device ID", min_value=1000, max_value=1100, value=1005)
+    amount = st.number_input("Transaction Amount ($)", min_value=1.0, max_value=10000.0, value=100.0, step=1.0)
+    transaction_type = st.selectbox("Transaction Type", list(schema_data["mappings"]["TYPE_MAP"].keys()))
+    location = st.selectbox("Transaction Location", list(schema_data["mappings"]["LOC_MAP"].keys()))
+    time = st.slider("Transaction Hour of Day", 0, 23, 12)
+    device_id = st.number_input("Device ID", min_value=1, max_value=9999, value=123)
 
-    if st.button("Predict Fraud"):
-        df = pd.DataFrame([{
+    if st.button("🚀 Predict Fraud"):
+        input_dict = {
             "amount": amount,
             "transaction_type": transaction_type,
             "location": location,
             "time": time,
-            "device_id": device_id
-        }])
+            "device_id": device_id,
+        }
 
-        features = preprocess_for_inference(df)
+        # Preprocess
+        features = preprocess_for_inference(input_dict, schema_data)
+
+        # Predict
         pred = model.predict(features)[0]
-        prob = model.predict_proba(features)[0][1]
+        proba = model.predict_proba(features)[0][1]
 
-        st.write(f"**Fraud Prediction:** {'🚨 Fraudulent' if pred else '✅ Legitimate'}")
-        st.write(f"**Fraud Probability:** {prob:.2f}")
+        # Show results
+        st.markdown(f"### 🔍 Prediction: {'⚠️ Fraudulent' if pred == 1 else '✅ Legitimate'}")
+        st.markdown(f"**Fraud Probability:** {proba:.2%}")
 
-        # GenAI explanation
-        explanation = explain_prediction(df.iloc[0].to_dict(), prob)
-        st.info(explanation)
+        # Explainability
+        explanation = explain_prediction(model, features)
+        st.markdown("### 🧾 Explanation")
+        st.json(explanation)
 
-# ------------------- Batch Mode -------------------
-else:
-    st.subheader("📂 Batch Fraud Detection via CSV")
-    uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
+# --- CSV Upload ---
+elif mode == "CSV Upload":
+    st.subheader("📂 Upload a Batch of Transactions (CSV)")
+    uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 
-    if uploaded_file:
+    if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
-        st.write("📊 Uploaded Data Preview:", df.head())
 
-        features = preprocess_for_inference(df)
-        preds = model.predict(features)
-        probs = model.predict_proba(features)[:, 1]
+        # Preprocess
+        processed_df = preprocess_for_inference(df, schema_data)
 
-        df["fraud_prediction"] = preds
-        df["fraud_probability"] = probs
+        # Predict
+        preds = model.predict(processed_df)
+        probs = model.predict_proba(processed_df)[:, 1]
 
-        st.write("✅ Predictions Completed:")
+        # Add results
+        df["Fraud_Prediction"] = ["⚠️ Fraudulent" if p == 1 else "✅ Legitimate" for p in preds]
+        df["Fraud_Probability"] = [f"{p:.2%}" for p in probs]
+
+        st.markdown("### 📊 Batch Prediction Results")
         st.dataframe(df)
 
-        csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button("Download Results", csv, "fraud_predictions.csv", "text/csv")
+        # Downloadable results
+        csv_out = df.to_csv(index=False).encode("utf-8")
+        st.download_button("📥 Download Results", csv_out, "fraud_predictions.csv", "text/csv")
