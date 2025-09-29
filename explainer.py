@@ -1,26 +1,23 @@
-import shap
-import matplotlib.pyplot as plt
-import pandas as pd
-from utils import load_model
+import os
+import google.generativeai as genai
 
-def explain_prediction(features, feature_names=None):
-    model = load_model()
+# Configure Gemini
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+def explain_prediction(transaction, prob):
+    """Generate a natural language fraud investigation note."""
+    prompt = f"""
+    You are a fraud analyst. Explain why the following transaction may be fraudulent.
+
+    Transaction: {transaction}
+    Fraud Probability: {prob:.2f}
+
+    Provide a clear, concise investigation-style note.
+    """
 
     try:
-        if feature_names:
-            X = pd.DataFrame(features, columns=feature_names)
-        else:
-            X = pd.DataFrame(features)
-
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(X)
-
-        plt.figure()
-        shap.summary_plot(shap_values, X, show=False)
-        plt.savefig("shap_summary.png", bbox_inches="tight")
-        plt.close()
-
-        return "shap_summary.png"
+        model = genai.GenerativeModel("gemini-pro")
+        response = model.generate_content(prompt)
+        return response.text
     except Exception as e:
-        print(f"⚠️ SHAP failed: {e}")
-        return None
+        return f"(⚠️ Explanation unavailable: {str(e)})"
