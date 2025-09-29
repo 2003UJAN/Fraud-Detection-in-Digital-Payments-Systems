@@ -1,20 +1,16 @@
-import joblib
 import os
-import json
-from train import train_model
+import joblib
+from train import train_model, load_schema
 
-MODEL_PATH = "fraud_model.pkl"
-SCHEMA_PATH = "feature_schema.json"
+MODEL_PATH = "model.pkl"
 
 def load_model():
-    if not os.path.exists(MODEL_PATH) or not os.path.exists(SCHEMA_PATH):
-        print("⚠️ Model or schema not found. Training a new model...")
+    """Load trained model, auto-train if missing."""
+    if not os.path.exists(MODEL_PATH):
+        print("⚠️ Model not found. Auto-training a new one...")
         train_model()
     return joblib.load(MODEL_PATH)
 
-def load_schema():
-    if not os.path.exists(SCHEMA_PATH):
-        print("⚠️ Schema not found. Training a new model...")
-        train_model()
-    with open(SCHEMA_PATH, "r") as f:
-        return json.load(f)
+def load_schema_safe():
+    """Load schema.json safely via train.py helper."""
+    return load_schema()
