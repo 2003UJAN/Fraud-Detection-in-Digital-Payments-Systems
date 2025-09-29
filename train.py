@@ -8,6 +8,7 @@ import json
 
 MODEL_PATH = "model.pkl"
 SCHEMA_PATH = "schema.json"
+DATA_PATH = "training_data.csv"
 
 # Load schema for mappings
 with open(SCHEMA_PATH, "r") as f:
@@ -28,10 +29,7 @@ def generate_dataset(n_samples=5000):
     times = np.random.randint(0, 24, n_samples)  # Hour of day
     devices = np.random.randint(1000, 1100, n_samples)  # Device IDs
 
-    # Fraud probability increases with:
-    #  - High amount
-    #  - Late night transactions
-    #  - Risky transaction types
+    # Fraud probability increases with risky features
     fraud_prob = (
         (amounts > 3000).astype(int) * 0.3
         + (times > 22).astype(int) * 0.2
@@ -62,11 +60,15 @@ def train_model():
     print("📊 Generating synthetic dataset...")
     df = generate_dataset()
 
-    print("🔄 Preprocessing dataset...")
-    df = preprocess(df)
+    # Save raw dataset before preprocessing
+    df.to_csv(DATA_PATH, index=False)
+    print(f"💾 Training dataset saved at {DATA_PATH}")
 
-    X = df[["amount", "transaction_type", "location", "time", "device_id"]]
-    y = df["label"]
+    print("🔄 Preprocessing dataset...")
+    df_processed = preprocess(df)
+
+    X = df_processed[["amount", "transaction_type", "location", "time", "device_id"]]
+    y = df_processed["label"]
 
     print("✂️ Splitting dataset...")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
