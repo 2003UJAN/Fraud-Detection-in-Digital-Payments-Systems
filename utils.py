@@ -1,7 +1,7 @@
 import joblib
 import os
 import json
-from train import train_model  # import training function
+from train import train_model
 
 MODEL_PATH = "fraud_model.pkl"
 SCHEMA_PATH = "feature_schema.json"
@@ -17,4 +17,4 @@ def load_schema():
         print("⚠️ Schema not found. Training a new model...")
         train_model()
     with open(SCHEMA_PATH, "r") as f:
-        return json.load(f)["features"]
+        return json.load(f)
