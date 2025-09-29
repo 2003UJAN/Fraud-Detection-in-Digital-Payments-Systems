@@ -1,0 +1,32 @@
+{
+  "mappings": {
+    "LOC_MAP": {
+      "New York": 0,
+      "Los Angeles": 1,
+      "Chicago": 2,
+      "Houston": 3,
+      "Miami": 4,
+      "San Francisco": 5,
+      "Seattle": 6,
+      "Boston": 7,
+      "Dallas": 8,
+      "Atlanta": 9
+    },
+    "TYPE_MAP": {
+      "POS": 0,
+      "Online": 1,
+      "Transfer": 2,
+      "ATM": 3,
+      "BillPay": 4,
+      "Cheque": 5
+    }
+  },
+  "features": [
+    "amount",
+    "transaction_type",
+    "location",
+    "time",
+    "device_id"
+  ],
+  "label": "label"
+}
