@@ -1,18 +1,5 @@
-# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.db
-
-# Envs
 .env
-venv/
-.venv/
-
-# Models
-models/
 *.pkl
-
-# Streamlit
-.streamlit/
+*.png
+*.csv
