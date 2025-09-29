@@ -1,30 +1,48 @@
 import pandas as pd
+import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 import joblib
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
-MODEL_PATH = os.getenv("MODEL_PATH", "models/fraud_model.pkl")
+MODEL_PATH = os.getenv("MODEL_PATH", "model.pkl")
 
-# Example training dataset (replace with real one)
-data = {
-    "amount": [100, 500, 200, 300, 10000, 50, 700, 1200],
-    "oldbalanceOrg": [1000, 1500, 300, 400, 20000, 60, 1500, 3000],
-    "newbalanceOrig": [900, 1000, 100, 100, 15000, 10, 800, 2500],
-    "oldbalanceDest": [0, 500, 0, 200, 5000, 0, 600, 2000],
-    "newbalanceDest": [100, 1000, 200, 500, 15000, 50, 1000, 3500],
-    "fraud": [0, 0, 0, 0, 1, 0, 1, 0],
-}
+def generate_synthetic_data(n_samples=5000):
+    np.random.seed(42)
 
-df = pd.DataFrame(data)
-X = df.drop("fraud", axis=1)
-y = df["fraud"]
+    data = pd.DataFrame({
+        "amount": np.random.uniform(1, 20000, n_samples),  # transaction amount
+        "time": np.random.randint(0, 24, n_samples),       # hour of day
+        "location": np.random.choice(["US", "EU", "ASIA", "AFRICA"], n_samples),
+        "merchant_category": np.random.choice(["electronics", "fashion", "grocery", "gaming", "others"], n_samples),
+        "device_type": np.random.choice(["mobile", "desktop", "tablet"], n_samples),
+        "previous_transactions": np.random.randint(0, 1000, n_samples),
+    })
 
-model = RandomForestClassifier(random_state=42)
-model.fit(X, y)
+    # Encode categorical manually
+    data["loc_encoded"] = data["location"].astype("category").cat.codes
+    data["merchant_encoded"] = data["merchant_category"].astype("category").cat.codes
+    data["device_encoded"] = data["device_type"].astype("category").cat.codes
 
-os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-joblib.dump(model, MODEL_PATH)
+    features = data[["amount", "time", "loc_encoded", "merchant_encoded", "device_encoded", "previous_transactions"]]
 
-print(f"✅ Model trained and saved at {MODEL_PATH}")
+    # Label fraud based on rules + noise
+    data["is_fraud"] = (
+        (data["amount"] > 10000) |
+        (data["time"].isin([1, 2, 3])) |
+        ((data["location"] == "ASIA") & (data["amount"] > 7000)) |
+        (data["device_type"] == "tablet")
+    ).astype(int)
+
+    return features, data["is_fraud"]
+
+def train_model():
+    X, y = generate_synthetic_data()
+    model = RandomForestClassifier(n_estimators=200, random_state=42)
+    model.fit(X, y)
+    joblib.dump(model, MODEL_PATH)
+    print(f"✅ Model trained and saved at {MODEL_PATH}")
+
+if __name__ == "__main__":
+    train_model()
