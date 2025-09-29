@@ -1,66 +1,87 @@
-import numpy as np
 import pandas as pd
+import numpy as np
+import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-import joblib
+from sklearn.metrics import accuracy_score
 import json
-import os
 
-MODEL_PATH = "fraud_model.pkl"
-SCHEMA_PATH = "feature_schema.json"
+MODEL_PATH = "model.pkl"
+SCHEMA_PATH = "schema.json"
 
-# Human-readable mappings
-LOC_MAP = {"US": 0, "EU": 1, "ASIA": 2, "AFRICA": 3}
-MERCHANT_MAP = {"Electronics": 0, "Clothing": 1, "Grocery": 2, "Travel": 3, "Others": 4}
-DEVICE_MAP = {"Mobile": 0, "Desktop": 1, "Tablet": 2}
+# Load schema for mappings
+with open(SCHEMA_PATH, "r") as f:
+    schema_data = json.load(f)
 
-def generate_training_data(n_samples=5000):
+LOC_MAP = schema_data["mappings"]["LOC_MAP"]
+TYPE_MAP = schema_data["mappings"]["TYPE_MAP"]
+
+def generate_dataset(n_samples=5000):
+    """Generate synthetic fraud detection dataset."""
+
     np.random.seed(42)
 
-    data = pd.DataFrame({
-        "amount": np.random.uniform(1, 20000, n_samples),
-        "time": np.random.randint(0, 24, n_samples),
-        "loc_encoded": np.random.choice(list(LOC_MAP.values()), n_samples),
-        "merchant_encoded": np.random.choice(list(MERCHANT_MAP.values()), n_samples),
-        "device_encoded": np.random.choice(list(DEVICE_MAP.values()), n_samples),
-        "previous_transactions": np.random.randint(0, 1000, n_samples)
+    # Generate random transactions
+    amounts = np.random.uniform(10, 5000, n_samples).round(2)
+    transaction_types = np.random.choice(list(TYPE_MAP.keys()), n_samples)
+    locations = np.random.choice(list(LOC_MAP.keys()), n_samples)
+    times = np.random.randint(0, 24, n_samples)  # Hour of day
+    devices = np.random.randint(1000, 1100, n_samples)  # Device IDs
+
+    # Fraud probability increases with:
+    #  - High amount
+    #  - Late night transactions
+    #  - Risky transaction types
+    fraud_prob = (
+        (amounts > 3000).astype(int) * 0.3
+        + (times > 22).astype(int) * 0.2
+        + (np.isin(transaction_types, ["Online", "Transfer"]).astype(int) * 0.3)
+        + np.random.uniform(0, 0.2, n_samples)
+    )
+
+    labels = (fraud_prob > 0.5).astype(int)
+
+    df = pd.DataFrame({
+        "amount": amounts,
+        "transaction_type": transaction_types,
+        "location": locations,
+        "time": times,
+        "device_id": devices,
+        "label": labels
     })
 
-    # Rule-based fraud simulation
-    data["is_fraud"] = (
-        (data["amount"] > 15000) |
-        ((data["time"] < 6) & (data["amount"] > 5000)) |
-        ((data["loc_encoded"] == 2) & (data["amount"] > 10000))
-    ).astype(int)
+    return df
 
-    return data
+def preprocess(df):
+    """Convert categorical values to numerical using mappings."""
+    df["transaction_type"] = df["transaction_type"].map(TYPE_MAP).fillna(-1)
+    df["location"] = df["location"].map(LOC_MAP).fillna(-1)
+    return df
 
 def train_model():
-    data = generate_training_data()
+    print("📊 Generating synthetic dataset...")
+    df = generate_dataset()
 
-    X = data.drop("is_fraud", axis=1)
-    y = data["is_fraud"]
+    print("🔄 Preprocessing dataset...")
+    df = preprocess(df)
 
+    X = df[["amount", "transaction_type", "location", "time", "device_id"]]
+    y = df["label"]
+
+    print("✂️ Splitting dataset...")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+    print("🌲 Training RandomForestClassifier...")
     model = RandomForestClassifier(n_estimators=200, random_state=42)
     model.fit(X_train, y_train)
 
-    joblib.dump(model, MODEL_PATH)
-    print(f"✅ Model saved to {MODEL_PATH}")
+    preds = model.predict(X_test)
+    acc = accuracy_score(y_test, preds)
 
-    # Save feature schema + mappings
-    schema = {
-        "features": list(X.columns),
-        "mappings": {
-            "LOC_MAP": LOC_MAP,
-            "MERCHANT_MAP": MERCHANT_MAP,
-            "DEVICE_MAP": DEVICE_MAP
-        }
-    }
-    with open(SCHEMA_PATH, "w") as f:
-        json.dump(schema, f, indent=4)
-    print(f"✅ Feature schema saved to {SCHEMA_PATH}")
+    print(f"✅ Training completed with accuracy: {acc:.4f}")
+
+    joblib.dump(model, MODEL_PATH)
+    print(f"💾 Model saved at {MODEL_PATH}")
 
 if __name__ == "__main__":
     train_model()
