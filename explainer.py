@@ -1,23 +1,31 @@
 import shap
 import pandas as pd
+import numpy as np
 
 def explain_prediction(model, features, prob=None):
     """
     Generate human-readable explanation for fraud prediction.
-    Uses SHAP values + optional fraud probability.
+    Works for tree-based classifiers (RandomForest, XGBoost, etc.).
     """
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(features)
 
+    # Handle classifiers (list of arrays) vs regressors (array)
+    if isinstance(shap_values, list):
+        # Take fraud class = 1
+        shap_importance = shap_values[1][0]
+    else:
+        shap_importance = shap_values[0]
+
+    # Convert to numpy array for safety
+    shap_importance = np.array(shap_importance)
+
     explanation = {
-        "Top Features": {},
+        "Top Features": {}
     }
 
-    # Take feature importance for the first prediction
+    # Align features with importance
     feature_names = features.columns
-    shap_importance = shap_values[1][0] if isinstance(shap_values, list) else shap_values[0]
-
-    # Store top features
     top_features = sorted(
         zip(feature_names, shap_importance),
         key=lambda x: abs(x[1]),
