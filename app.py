@@ -1,121 +1,91 @@
-import os
 import streamlit as st
 import pandas as pd
+import os
 import numpy as np
 from utils import load_model
 from explainer import explain_prediction
-from dotenv import load_dotenv
-import google.generativeai as genai
 
-# Load environment
-load_dotenv()
-MODEL_PATH = os.getenv("MODEL_PATH", "model.pkl")
-API_KEY = os.getenv("GEMINI_API_KEY")
-
-if API_KEY:
-    genai.configure(api_key=API_KEY)
-
-# Load model
+# Load trained model
 model = load_model()
 
-# ---------------------------
-# 🔹 Auto-generate sample CSV
-# ---------------------------
+# Auto-generate sample CSV if not present
 SAMPLE_CSV = "sample_data.csv"
-
-def generate_sample_csv(filename=SAMPLE_CSV, n_samples=20):
-    np.random.seed(42)
-    data = pd.DataFrame({
-        "amount": np.random.uniform(1, 20000, n_samples),
-        "time": np.random.randint(0, 24, n_samples),
-        "loc_encoded": np.random.choice([0, 1, 2, 3], n_samples),  # US=0, EU=1, ASIA=2, AFRICA=3
-        "merchant_encoded": np.random.choice([0, 1, 2, 3, 4], n_samples),  # electronics=0 ... others=4
-        "device_encoded": np.random.choice([0, 1, 2], n_samples),  # mobile=0, desktop=1, tablet=2
-        "previous_transactions": np.random.randint(0, 1000, n_samples)
-    })
-    data.to_csv(filename, index=False)
-
 if not os.path.exists(SAMPLE_CSV):
+    def generate_sample_csv(filename=SAMPLE_CSV, n_samples=20):
+        np.random.seed(42)
+        data = pd.DataFrame({
+            "amount": np.random.uniform(1, 20000, n_samples),
+            "time": np.random.randint(0, 24, n_samples),
+            "loc_encoded": np.random.choice([0, 1, 2, 3], n_samples),
+            "merchant_encoded": np.random.choice([0, 1, 2, 3, 4], n_samples),
+            "device_encoded": np.random.choice([0, 1, 2], n_samples),
+            "previous_transactions": np.random.randint(0, 1000, n_samples)
+        })
+        data.to_csv(filename, index=False)
+
     generate_sample_csv()
 
-# ---------------------------
-# 🔹 Streamlit App
-# ---------------------------
-st.set_page_config(page_title="Fraud Detection System", layout="wide")
-st.title("💳 Fraud Detection in Digital Payments")
+# Streamlit UI
+st.title("🔍 Fraud Detection in Digital Payment Systems")
+st.write("Real-time and batch fraud detection with explainable AI (SHAP).")
 
-# Tabs
-tab1, tab2 = st.tabs(["🔹 Single Transaction", "📂 Batch Detection (CSV)"])
+tab1, tab2 = st.tabs(["🧍 Single Transaction", "📂 Batch Detection (CSV)"])
 
-# ---------------------------
-# 🔹 Single Transaction Tab
-# ---------------------------
+# ---------------- Single Transaction ----------------
 with tab1:
     st.subheader("Enter Transaction Details")
-    amount = st.number_input("Transaction Amount", 1, 20000)
-    time = st.slider("Transaction Hour (0-23)", 0, 23, 12)
-    location = st.selectbox("Location", ["US", "EU", "ASIA", "AFRICA"])
-    merchant = st.selectbox("Merchant Category", ["electronics", "fashion", "grocery", "gaming", "others"])
-    device = st.selectbox("Device Type", ["mobile", "desktop", "tablet"])
-    prev_txns = st.number_input("Previous Transactions", 0, 2000)
 
-    # Encode categorical variables (must match training)
-    loc_encoded = ["US", "EU", "ASIA", "AFRICA"].index(location)
-    merchant_encoded = ["electronics", "fashion", "grocery", "gaming", "others"].index(merchant)
-    device_encoded = ["mobile", "desktop", "tablet"].index(device)
+    amount = st.number_input("Transaction Amount ($)", min_value=0.01, max_value=50000.0, value=100.0)
+    time = st.slider("Transaction Time (0–23 hrs)", 0, 23, 12)
+    loc_encoded = st.selectbox("Location", [0, 1, 2, 3])  # US=0, EU=1, ASIA=2, AFRICA=3
+    merchant_encoded = st.selectbox("Merchant Category", [0, 1, 2, 3, 4])  # electronics=0 ... others=4
+    device_encoded = st.selectbox("Device Type", [0, 1, 2])  # mobile=0, desktop=1, tablet=2
+    previous_transactions = st.number_input("Previous Transactions", min_value=0, max_value=1000, value=10)
 
-    # Create DataFrame with correct feature order
-    features_df = pd.DataFrame([{
-        "amount": amount,
-        "time": time,
-        "loc_encoded": loc_encoded,
-        "merchant_encoded": merchant_encoded,
-        "device_encoded": device_encoded,
-        "previous_transactions": prev_txns
-    }])
+    if st.button("🔎 Predict Fraud"):
+        features = [[amount, time, loc_encoded, merchant_encoded, device_encoded, previous_transactions]]
+        pred = model.predict(features)[0]
+        proba = model.predict_proba(features)[0][1]
 
-    if st.button("🚀 Predict Fraud"):
-        pred = model.predict(features_df)[0]
-        st.write("🔒 Prediction:", "Fraudulent ❌" if pred == 1 else "Legitimate ✅")
+        if pred == 1:
+            st.error(f"⚠️ Fraudulent Transaction Detected (Confidence: {proba:.2f})")
+        else:
+            st.success(f"✅ Legitimate Transaction (Confidence: {1-proba:.2f})")
 
-        shap_path = explain_prediction(
-            features_df,
-            ["amount", "time", "loc_encoded", "merchant_encoded", "device_encoded", "previous_transactions"]
-        )
-        if shap_path:
-            st.image(shap_path, caption="SHAP Explanation")
+        # Explain prediction
+        explanation = explain_prediction(model, features)
+        st.write("### 🔍 Explanation (SHAP Values)")
+        st.json(explanation)
 
-        # Gemini explanation
-        if API_KEY:
-            fraud_text = (
-                f"Transaction details: amount={amount}, time={time}, location={location}, "
-                f"merchant={merchant}, device={device}, prev_txns={prev_txns}. Prediction={pred}"
-            )
-            model_g = genai.GenerativeModel("gemini-1.5-flash")
-            response = model_g.generate_content(
-                f"Explain in simple language why this transaction might be fraudulent or legitimate: {fraud_text}"
-            )
-            st.info(response.text)
-
-# ---------------------------
-# 📂 Batch Detection Tab
-# ---------------------------
+# ---------------- Batch Detection ----------------
 with tab2:
     st.subheader("Upload CSV for Batch Fraud Detection")
-    st.caption(f"You can test with the auto-generated file: **{SAMPLE_CSV}**")
 
-    uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
+    uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+    schema = load_schema()
 
     if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
-        required_cols = ["amount", "time", "loc_encoded", "merchant_encoded", "device_encoded", "previous_transactions"]
+        data = pd.read_csv(uploaded_file)
+    else:
+        st.info("No file uploaded. Using sample_data.csv for demo.")
+        data = pd.read_csv(SAMPLE_CSV)
 
-        if all(col in df.columns for col in required_cols):
-            preds = model.predict(df[required_cols])
-            df["Prediction"] = ["Fraudulent ❌" if p == 1 else "Legitimate ✅" for p in preds]
-            st.dataframe(df)
+    # Validate schema
+    if list(data.columns) != schema:
+        st.error(f"❌ Invalid CSV schema. Expected columns: {schema}")
+    else:
+        st.write("### 📄 Input Data Preview")
+        st.dataframe(data.head())
 
-            csv_download = df.to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Download Results", csv_download, "fraud_predictions.csv", "text/csv")
-        else:
-            st.error(f"CSV must contain columns: {required_cols}")
+        if st.button("🚀 Run Batch Detection"):
+            predictions = model.predict(data)
+            probabilities = model.predict_proba(data)[:, 1]
+
+            data["Fraud_Prediction"] = predictions
+            data["Fraud_Probability"] = probabilities
+
+            st.write("### ✅ Results")
+            st.dataframe(data.head())
+
+            csv_download = data.to_csv(index=False).encode("utf-8")
+            st.download_button("📥 Download Results", csv_download, "fraud_results.csv", "text/csv")
