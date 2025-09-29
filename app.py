@@ -1,46 +1,72 @@
-import sys
 import os
 import streamlit as st
 import pandas as pd
-
-# Ensure utils.py can be imported
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 from utils import load_model
 from explainer import explain_prediction
+from dotenv import load_dotenv
+import google.generativeai as genai
 
-# Load model (auto-trains if missing)
+# Load environment
+load_dotenv()
+MODEL_PATH = os.getenv("MODEL_PATH", "model.pkl")
+API_KEY = os.getenv("GEMINI_API_KEY")
+
+if API_KEY:
+    genai.configure(api_key=API_KEY)
+
+# Load model
 model = load_model()
 
-st.title("💳 Fraud Detection in Digital Payment Systems (GenAI Powered)")
+st.set_page_config(page_title="Fraud Detection System", layout="wide")
+st.title("💳 Fraud Detection in Digital Payments")
 
-st.write("Enter transaction details to check if it's fraudulent or not:")
+# Tabs
+tab1, tab2 = st.tabs(["🔹 Single Transaction", "📂 Batch Detection (CSV)"])
 
-# Input fields
-amount = st.number_input("Transaction Amount", min_value=0.0, format="%.2f")
-oldbalanceOrg = st.number_input("Old Balance (Origin)", min_value=0.0, format="%.2f")
-newbalanceOrig = st.number_input("New Balance (Origin)", min_value=0.0, format="%.2f")
-oldbalanceDest = st.number_input("Old Balance (Destination)", min_value=0.0, format="%.2f")
-newbalanceDest = st.number_input("New Balance (Destination)", min_value=0.0, format="%.2f")
+with tab1:
+    st.subheader("Enter Transaction Details")
+    amount = st.number_input("Transaction Amount", 1, 20000)
+    time = st.slider("Transaction Hour (0-23)", 0, 23, 12)
+    location = st.selectbox("Location", ["US", "EU", "ASIA", "AFRICA"])
+    merchant = st.selectbox("Merchant Category", ["electronics", "fashion", "grocery", "gaming", "others"])
+    device = st.selectbox("Device Type", ["mobile", "desktop", "tablet"])
+    prev_txns = st.number_input("Previous Transactions", 0, 2000)
 
-if st.button("Predict Fraud"):
-    features = [[amount, oldbalanceOrg, newbalanceOrig, oldbalanceDest, newbalanceDest]]
-    feature_names = ["amount", "oldbalanceOrg", "newbalanceOrig", "oldbalanceDest", "newbalanceDest"]
+    loc_encoded = ["US", "EU", "ASIA", "AFRICA"].index(location)
+    merchant_encoded = ["electronics", "fashion", "grocery", "gaming", "others"].index(merchant)
+    device_encoded = ["mobile", "desktop", "tablet"].index(device)
 
-    prediction = model.predict(features)[0]
+    features = [[amount, time, loc_encoded, merchant_encoded, device_encoded, prev_txns]]
 
-    if prediction == 1:
-        st.error("⚠️ Fraudulent Transaction Detected!")
-    else:
-        st.success("✅ Legitimate Transaction")
+    if st.button("🚀 Predict Fraud"):
+        pred = model.predict(features)[0]
+        st.write("🔒 Prediction:", "Fraudulent ❌" if pred == 1 else "Legitimate ✅")
 
-    st.subheader("🔍 Explanation")
-    shap_result, note = explain_prediction(features, feature_names)
+        shap_path = explain_prediction(features, ["amount", "time", "loc", "merchant", "device", "prev_txns"])
+        if shap_path:
+            st.image(shap_path, caption="SHAP Explanation")
 
-    if isinstance(shap_result, str) and shap_result.endswith(".png"):
-        st.image(shap_result, caption="SHAP Explanation", use_column_width=True)
-    else:
-        st.info(shap_result)
+        # Gemini explanation
+        if API_KEY:
+            fraud_text = f"Transaction details: amount={amount}, time={time}, location={location}, merchant={merchant}, device={device}, prev_txns={prev_txns}. Prediction={pred}"
+            model_g = genai.GenerativeModel("gemini-1.5-flash")
+            response = model_g.generate_content(f"Explain why this transaction might be fraudulent: {fraud_text}")
+            st.info(response.text)
 
-    st.markdown("### 📝 GenAI Fraud Investigation Note")
-    st.write(note)
+with tab2:
+    st.subheader("Upload CSV for Batch Fraud Detection")
+    uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
+
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
+        required_cols = ["amount", "time", "loc_encoded", "merchant_encoded", "device_encoded", "previous_transactions"]
+
+        if all(col in df.columns for col in required_cols):
+            preds = model.predict(df[required_cols])
+            df["Prediction"] = ["Fraudulent ❌" if p == 1 else "Legitimate ✅" for p in preds]
+            st.dataframe(df)
+
+            csv_download = df.to_csv(index=False).encode("utf-8")
+            st.download_button("⬇️ Download Results", csv_download, "fraud_predictions.csv", "text/csv")
+        else:
+            st.error(f"CSV must contain columns: {required_cols}")
