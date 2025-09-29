@@ -1,0 +1,4 @@
+amount,transaction_type,location,time,device_id
+4500,Online,New York,23,1005
+200,ATM,London,14,1002
+3200,Transfer,Mumbai,1,1007
