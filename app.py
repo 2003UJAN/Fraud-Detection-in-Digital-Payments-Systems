@@ -23,6 +23,9 @@ st.title("💳 Fraud Detection in Digital Payments")
 # Tabs
 tab1, tab2 = st.tabs(["🔹 Single Transaction", "📂 Batch Detection (CSV)"])
 
+# ---------------------------
+# 🔹 Single Transaction Tab
+# ---------------------------
 with tab1:
     st.subheader("Enter Transaction Details")
     amount = st.number_input("Transaction Amount", 1, 20000)
@@ -32,27 +35,47 @@ with tab1:
     device = st.selectbox("Device Type", ["mobile", "desktop", "tablet"])
     prev_txns = st.number_input("Previous Transactions", 0, 2000)
 
+    # Encode categorical variables (must match training)
     loc_encoded = ["US", "EU", "ASIA", "AFRICA"].index(location)
     merchant_encoded = ["electronics", "fashion", "grocery", "gaming", "others"].index(merchant)
     device_encoded = ["mobile", "desktop", "tablet"].index(device)
 
-    features = [[amount, time, loc_encoded, merchant_encoded, device_encoded, prev_txns]]
+    # Create DataFrame with correct feature order
+    features_df = pd.DataFrame([{
+        "amount": amount,
+        "time": time,
+        "loc_encoded": loc_encoded,
+        "merchant_encoded": merchant_encoded,
+        "device_encoded": device_encoded,
+        "previous_transactions": prev_txns
+    }])
 
     if st.button("🚀 Predict Fraud"):
-        pred = model.predict(features)[0]
+        pred = model.predict(features_df)[0]
         st.write("🔒 Prediction:", "Fraudulent ❌" if pred == 1 else "Legitimate ✅")
 
-        shap_path = explain_prediction(features, ["amount", "time", "loc", "merchant", "device", "prev_txns"])
+        shap_path = explain_prediction(
+            features_df,
+            ["amount", "time", "loc_encoded", "merchant_encoded", "device_encoded", "previous_transactions"]
+        )
         if shap_path:
             st.image(shap_path, caption="SHAP Explanation")
 
         # Gemini explanation
         if API_KEY:
-            fraud_text = f"Transaction details: amount={amount}, time={time}, location={location}, merchant={merchant}, device={device}, prev_txns={prev_txns}. Prediction={pred}"
+            fraud_text = (
+                f"Transaction details: amount={amount}, time={time}, location={location}, "
+                f"merchant={merchant}, device={device}, prev_txns={prev_txns}. Prediction={pred}"
+            )
             model_g = genai.GenerativeModel("gemini-1.5-flash")
-            response = model_g.generate_content(f"Explain why this transaction might be fraudulent: {fraud_text}")
+            response = model_g.generate_content(
+                f"Explain in simple language why this transaction might be fraudulent or legitimate: {fraud_text}"
+            )
             st.info(response.text)
 
+# ---------------------------
+# 📂 Batch Detection Tab
+# ---------------------------
 with tab2:
     st.subheader("Upload CSV for Batch Fraud Detection")
     uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
