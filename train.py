@@ -20,21 +20,18 @@ def load_schema():
 
 def generate_dataset(n_samples=5000):
     """Generate synthetic fraud detection dataset."""
-
     schema_data = load_schema()
     LOC_MAP = schema_data["mappings"]["LOC_MAP"]
     TYPE_MAP = schema_data["mappings"]["TYPE_MAP"]
 
     np.random.seed(42)
 
-    # Generate random transactions
     amounts = np.random.uniform(10, 5000, n_samples).round(2)
     transaction_types = np.random.choice(list(TYPE_MAP.keys()), n_samples)
     locations = np.random.choice(list(LOC_MAP.keys()), n_samples)
-    times = np.random.randint(0, 24, n_samples)  # Hour of day
-    devices = np.random.randint(1000, 1100, n_samples)  # Device IDs
+    times = np.random.randint(0, 24, n_samples)
+    devices = np.random.randint(1000, 1100, n_samples)
 
-    # Fraud probability increases with risky features
     fraud_prob = (
         (amounts > 3000).astype(int) * 0.3
         + (times > 22).astype(int) * 0.2
@@ -69,7 +66,6 @@ def train_model():
     print("📊 Generating synthetic dataset...")
     df = generate_dataset()
 
-    # Save raw dataset
     df.to_csv(DATA_PATH, index=False)
     print(f"💾 Training dataset saved at {DATA_PATH}")
 
