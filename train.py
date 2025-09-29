@@ -5,20 +5,25 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 import json
+import os
 
 MODEL_PATH = "model.pkl"
 SCHEMA_PATH = "schema.json"
 DATA_PATH = "training_data.csv"
 
-# Load schema for mappings
-with open(SCHEMA_PATH, "r") as f:
-    schema_data = json.load(f)
-
-LOC_MAP = schema_data["mappings"]["LOC_MAP"]
-TYPE_MAP = schema_data["mappings"]["TYPE_MAP"]
+def load_schema():
+    """Safely load schema.json when needed."""
+    if not os.path.exists(SCHEMA_PATH):
+        raise FileNotFoundError(f"❌ {SCHEMA_PATH} not found. Please add schema.json in project root.")
+    with open(SCHEMA_PATH, "r") as f:
+        return json.load(f)
 
 def generate_dataset(n_samples=5000):
     """Generate synthetic fraud detection dataset."""
+
+    schema_data = load_schema()
+    LOC_MAP = schema_data["mappings"]["LOC_MAP"]
+    TYPE_MAP = schema_data["mappings"]["TYPE_MAP"]
 
     np.random.seed(42)
 
@@ -52,6 +57,10 @@ def generate_dataset(n_samples=5000):
 
 def preprocess(df):
     """Convert categorical values to numerical using mappings."""
+    schema_data = load_schema()
+    LOC_MAP = schema_data["mappings"]["LOC_MAP"]
+    TYPE_MAP = schema_data["mappings"]["TYPE_MAP"]
+
     df["transaction_type"] = df["transaction_type"].map(TYPE_MAP).fillna(-1)
     df["location"] = df["location"].map(LOC_MAP).fillna(-1)
     return df
@@ -60,7 +69,7 @@ def train_model():
     print("📊 Generating synthetic dataset...")
     df = generate_dataset()
 
-    # Save raw dataset before preprocessing
+    # Save raw dataset
     df.to_csv(DATA_PATH, index=False)
     print(f"💾 Training dataset saved at {DATA_PATH}")
 
