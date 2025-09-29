@@ -1,6 +1,7 @@
 import os
 import streamlit as st
 import pandas as pd
+import numpy as np
 from utils import load_model
 from explainer import explain_prediction
 from dotenv import load_dotenv
@@ -17,6 +18,29 @@ if API_KEY:
 # Load model
 model = load_model()
 
+# ---------------------------
+# 🔹 Auto-generate sample CSV
+# ---------------------------
+SAMPLE_CSV = "sample_data.csv"
+
+def generate_sample_csv(filename=SAMPLE_CSV, n_samples=20):
+    np.random.seed(42)
+    data = pd.DataFrame({
+        "amount": np.random.uniform(1, 20000, n_samples),
+        "time": np.random.randint(0, 24, n_samples),
+        "loc_encoded": np.random.choice([0, 1, 2, 3], n_samples),  # US=0, EU=1, ASIA=2, AFRICA=3
+        "merchant_encoded": np.random.choice([0, 1, 2, 3, 4], n_samples),  # electronics=0 ... others=4
+        "device_encoded": np.random.choice([0, 1, 2], n_samples),  # mobile=0, desktop=1, tablet=2
+        "previous_transactions": np.random.randint(0, 1000, n_samples)
+    })
+    data.to_csv(filename, index=False)
+
+if not os.path.exists(SAMPLE_CSV):
+    generate_sample_csv()
+
+# ---------------------------
+# 🔹 Streamlit App
+# ---------------------------
 st.set_page_config(page_title="Fraud Detection System", layout="wide")
 st.title("💳 Fraud Detection in Digital Payments")
 
@@ -78,6 +102,8 @@ with tab1:
 # ---------------------------
 with tab2:
     st.subheader("Upload CSV for Batch Fraud Detection")
+    st.caption(f"You can test with the auto-generated file: **{SAMPLE_CSV}**")
+
     uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 
     if uploaded_file is not None:
