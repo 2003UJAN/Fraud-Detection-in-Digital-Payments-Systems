@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import shap
 from utils import load_model, load_schema_safe, preprocess_for_inference
 from explainer import explain_prediction
 
